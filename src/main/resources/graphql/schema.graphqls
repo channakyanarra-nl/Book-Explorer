@@ -1,0 +1,37 @@
+type BookSearchResponse {
+    totalResults: Int
+    page: Int
+    limit: Int
+    books: [Book]
+}
+
+type Book {
+    id: ID
+    title: String
+    subtitle: String
+    description: String
+    publishYear: Int
+    isbn: String
+    coverImage: String
+    authors: [Author]
+    subjects: [String]
+    averageRating: Float
+    reviewCount: Int
+    isFavourite: Boolean
+}
+
+type Author {
+    id: ID
+    name: String
+}
+
+type Query {
+
+    # Search books from Open Library
+    searchBooks(
+        title: String!
+        page: Int = 1
+        limit: Int = 10
+    ): BookSearchResponse
+
+}
