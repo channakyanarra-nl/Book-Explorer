@@ -1,6 +1,7 @@
 package com.nineleaps.BookExplorer.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nineleaps.BookExplorer.dto.BookDto;
 import com.nineleaps.BookExplorer.dto.BookSearchResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -83,5 +84,44 @@ class OpenLibraryServiceTest {
         assertThat(result.totalResults()).isEqualTo(50);
         verify(webClientAdapter, times(1)).fetchBooksFromApi(TITLE, PAGE, LIMIT);
         verify(valueOperations, times(1)).set(eq(CACHE_KEY), eq(apiResponse), any(Duration.class));
+    }
+
+    @Test
+    @DisplayName("Should return cached book details if available in Redis")
+    void shouldReturnCachedBookDetails() {
+        // Arrange
+        String workId = "OL27448W";
+        String cacheKey = "book:" + workId;
+        BookDto cachedBook = new BookDto(workId, "The Hobbit", null, "A great adventure", null, null, null, null, null, null, null, null);
+
+        when(valueOperations.get(cacheKey)).thenReturn(cachedBook);
+        when(objectMapper.convertValue(cachedBook, BookDto.class)).thenReturn(cachedBook);
+
+        // Act
+        BookDto result = openLibraryService.getBookDetails(workId);
+
+        // Assert
+        assertThat(result.title()).isEqualTo("The Hobbit");
+        verify(webClientAdapter, never()).fetchBookDetailsFromApi(anyString());
+    }
+
+    @Test
+    @DisplayName("Should fetch book from API and cache it when Redis is empty")
+    void shouldFetchBookFromApiAndCacheWhenRedisEmpty() {
+        // Arrange
+        String workId = "OL27448W";
+        String cacheKey = "book:" + workId;
+        BookDto apiBook = new BookDto(workId, "The Hobbit", null, "A great adventure", null, null, null, null, null, null, null, null);
+
+        when(valueOperations.get(cacheKey)).thenReturn(null);
+        when(webClientAdapter.fetchBookDetailsFromApi(workId)).thenReturn(apiBook);
+
+        // Act
+        BookDto result = openLibraryService.getBookDetails(workId);
+
+        // Assert
+        assertThat(result.title()).isEqualTo("The Hobbit");
+        verify(webClientAdapter, times(1)).fetchBookDetailsFromApi(workId);
+        verify(valueOperations, times(1)).set(eq(cacheKey), eq(apiBook), any(Duration.class));
     }
 }

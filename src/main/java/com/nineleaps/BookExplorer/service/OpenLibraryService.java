@@ -1,5 +1,6 @@
 package com.nineleaps.BookExplorer.service;
 
+import com.nineleaps.BookExplorer.dto.BookDto;
 import com.nineleaps.BookExplorer.dto.BookSearchResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -38,5 +39,25 @@ public class OpenLibraryService {
         redisTemplate.opsForValue().set(cacheKey, response, Duration.ofHours(1));
 
         return response;
+    }
+
+    public BookDto getBookDetails(String workId) {
+        String cacheKey = "book:" + workId;
+
+        // 1. Check Redis Cache
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            return objectMapper.convertValue(cached, BookDto.class);
+        }
+
+        // 2. Cache miss -> Fetch from API
+        BookDto book = webClientAdapter.fetchBookDetailsFromApi(workId);
+
+        // 3. Save to Redis (Cache for 1 day)
+        if (book != null) {
+            redisTemplate.opsForValue().set(cacheKey, book, Duration.ofDays(1));
+        }
+
+        return book;
     }
 }

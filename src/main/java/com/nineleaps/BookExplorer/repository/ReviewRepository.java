@@ -14,4 +14,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Double calculateAverageRatingByBookId(@Param("bookId") String bookId);
 
     boolean existsByUserIdAndBookId(Long userId, String bookId);
+
+    long countByBookId(String bookId);
 }

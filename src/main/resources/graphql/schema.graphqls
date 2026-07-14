@@ -34,4 +34,9 @@ type Query {
         limit: Int = 10
     ): BookSearchResponse
 
+    book(
+        id: ID!
+    ): Book
+
+
 }

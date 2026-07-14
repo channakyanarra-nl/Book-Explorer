@@ -49,6 +49,44 @@ public class OpenLibraryWebClient {
         return new BookSearchResponse(totalResults, page, limit, books);
     }
 
+    public BookDto fetchBookDetailsFromApi(String workId) {
+        JsonNode response = webClient.get()
+                .uri("/works/{workId}.json", workId)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .block();
+
+        if (response == null) return null;
+
+        String title = response.has("title") ? response.get("title").asText() : null;
+
+        // Description parsing (handles both String and nested Object formats)
+        String description = null;
+        if (response.has("description")) {
+            JsonNode descNode = response.get("description");
+            description = descNode.isObject() && descNode.has("value")
+                    ? descNode.get("value").asText()
+                    : descNode.asText();
+        }
+
+        // Extract the first cover ID if available
+        String coverImage = null;
+        if (response.has("covers") && response.get("covers").isArray() && !response.get("covers").isEmpty()) {
+            coverImage = "https://covers.openlibrary.org/b/id/" + response.get("covers").get(0).asText() + "-L.jpg";
+        }
+
+        // Extract subjects
+        List<String> subjects = new ArrayList<>();
+        if (response.has("subjects")) {
+            for (JsonNode subject : response.get("subjects")) {
+                subjects.add(subject.asText());
+            }
+        }
+
+        // Return the partial DTO (local database metrics remain null for now)
+        return new BookDto(workId, title, null, description, null, null, coverImage, null, subjects, null, null, null);
+    }
+
     private BookDto mapNodeToBookDto(JsonNode doc) {
         // To Get ID by removing the "/works/" in the open library response
         String rawKey = doc.has("key") ? doc.get("key").asText() : "";
