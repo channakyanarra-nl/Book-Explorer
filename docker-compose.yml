@@ -3,9 +3,9 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: book_explorer
+      POSTGRES_USER: "myuser"
+      POSTGRES_PASSWORD: "secret"
+      POSTGRES_DB: bookexplorer
     ports:
       - "5432:5432"
     volumes:
