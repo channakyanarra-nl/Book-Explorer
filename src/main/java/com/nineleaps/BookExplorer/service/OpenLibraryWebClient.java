@@ -5,7 +5,7 @@ import com.nineleaps.BookExplorer.dto.BookDto;
 import com.nineleaps.BookExplorer.dto.BookSearchResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,16 +13,18 @@ import java.util.List;
 @Component
 public class OpenLibraryWebClient {
 
-    private final WebClient webClient;
+    // 1. Changed to RestClient
+    private final RestClient restClient;
 
-    public OpenLibraryWebClient(WebClient.Builder webClientBuilder) {
-        this.webClient = webClientBuilder.baseUrl("https://openlibrary.org").build();
+    public OpenLibraryWebClient(RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder.baseUrl("https://openlibrary.org").build();
     }
 
     public BookSearchResponse fetchBooksFromApi(String title, int page, int limit) {
         int offset = (page - 1) * limit;
 
-        JsonNode response = webClient.get()
+        // 2. Simplified the HTTP call. No more .block() needed!
+        JsonNode response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/search.json")
                         .queryParam("q", title)
@@ -30,8 +32,7 @@ public class OpenLibraryWebClient {
                         .queryParam("offset", offset)
                         .build())
                 .retrieve()
-                .bodyToMono(JsonNode.class)
-                .block();
+                .body(JsonNode.class);
 
         System.out.println("API Raw Response: " + (response != null ? response.get("numFound") : "NULL"));
 
@@ -50,11 +51,11 @@ public class OpenLibraryWebClient {
     }
 
     public BookDto fetchBookDetailsFromApi(String workId) {
-        JsonNode response = webClient.get()
+        // 3. Simplified the HTTP call here as well
+        JsonNode response = restClient.get()
                 .uri("/works/{workId}.json", workId)
                 .retrieve()
-                .bodyToMono(JsonNode.class)
-                .block();
+                .body(JsonNode.class);
 
         if (response == null) return null;
 
