@@ -16,7 +16,7 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class AuthController {
 
-    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -30,10 +30,10 @@ public class AuthController {
 
     @MutationMapping
     public User register(@Argument RegisterInput input) {
-        logger.info("Attempting Registration for user : "+input.email());
+        log.info("Attempting Registration for user : "+input.email());
 
         if (userRepository.existsByEmail(input.email())) {
-            logger.error("Email {} entered is already in use", input.email());
+            log.error("Email {} entered is already in use", input.email());
             throw new EmailAlreadyInUseException("Email already in use");
         }
 
@@ -48,13 +48,20 @@ public class AuthController {
 
     @MutationMapping
     public AuthResponse login(@Argument String email, @Argument String password) {
+        log.info("Attempting login for user: {}", email);
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> {
+                    log.warn("Login failed: User {} not found in database", email);
+                    return new RuntimeException("User not found");
+                });
 
-        // Manual password verification
+        // password verification
         if (!passwordEncoder.matches(password, user.getPassword())) {
+            log.warn("Login failed: Invalid password provided for user {}", email);
             throw new RuntimeException("Invalid credentials");
         }
+
+        log.info("User {} successfully logged in", email);
 
         // Generate the token using the simple email payload
         String token = jwtService.generateToken(user.getEmail());

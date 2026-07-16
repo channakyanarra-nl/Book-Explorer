@@ -4,16 +4,17 @@ import com.nineleaps.BookExplorer.dto.AuthorDto;
 import com.nineleaps.BookExplorer.dto.BookDto;
 import com.nineleaps.BookExplorer.dto.BookSearchResponse;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.extern.slf4j.Slf4j; // 1. Added Lombok logging
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Component
 public class OpenLibraryWebClient {
 
-    // 1. Changed to RestClient
     private final RestClient restClient;
 
     public OpenLibraryWebClient(RestClient.Builder restClientBuilder) {
@@ -22,8 +23,8 @@ public class OpenLibraryWebClient {
 
     public BookSearchResponse fetchBooksFromApi(String title, int page, int limit) {
         int offset = (page - 1) * limit;
+        log.info("Sending HTTP GET to OpenLibrary API for search query: '{}' (offset: {}, limit: {})", title, offset, limit);
 
-        // 2. Simplified the HTTP call. No more .block() needed!
         JsonNode response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/search.json")
@@ -34,9 +35,12 @@ public class OpenLibraryWebClient {
                 .retrieve()
                 .body(JsonNode.class);
 
-        System.out.println("API Raw Response: " + (response != null ? response.get("numFound") : "NULL"));
+        // 3. Replaced System.out.println with log.debug
+        log.debug("OpenLibrary API Search Raw Response numFound: {}",
+                (response != null && response.has("numFound")) ? response.get("numFound").asText() : "NULL");
 
         if (response == null || !response.has("docs")) {
+            log.warn("OpenLibrary API returned null or missing 'docs' for search query: '{}'", title);
             return new BookSearchResponse(0, page, limit, List.of());
         }
 
@@ -47,21 +51,26 @@ public class OpenLibraryWebClient {
             books.add(mapNodeToBookDto(doc));
         }
 
+        log.info("Successfully parsed {} books from OpenLibrary API response", books.size());
         return new BookSearchResponse(totalResults, page, limit, books);
     }
 
     public BookDto fetchBookDetailsFromApi(String workId) {
-        // 3. Simplified the HTTP call here as well
+        log.info("Sending HTTP GET to OpenLibrary API for book details: {}", workId);
+
         JsonNode response = restClient.get()
                 .uri("/works/{workId}.json", workId)
                 .retrieve()
                 .body(JsonNode.class);
 
-        if (response == null) return null;
+        if (response == null) {
+            log.warn("OpenLibrary API returned null response for workId: {}", workId);
+            return null;
+        }
 
         String title = response.has("title") ? response.get("title").asText() : null;
 
-        // Description parsing (handles both String and nested Object formats)
+        // Description parsing
         String description = null;
         if (response.has("description")) {
             JsonNode descNode = response.get("description");
@@ -84,23 +93,20 @@ public class OpenLibraryWebClient {
             }
         }
 
-        // Return the partial DTO (local database metrics remain null for now)
+        log.debug("Successfully parsed book details for workId: {}", workId);
         return new BookDto(workId, title, null, description, null, null, coverImage, null, subjects, null, null, null);
     }
 
     private BookDto mapNodeToBookDto(JsonNode doc) {
-        // To Get ID by removing the "/works/" in the open library response
         String rawKey = doc.has("key") ? doc.get("key").asText() : "";
         String id = rawKey.replace("/works/", "");
 
         String title = doc.has("title") ? doc.get("title").asText() : null;
         Integer publishYear = doc.has("first_publish_year") ? doc.get("first_publish_year").asInt() : null;
 
-        // Extract first ISBN if available
         String isbn = (doc.has("isbn") && doc.get("isbn").isArray() && !doc.get("isbn").isEmpty())
                 ? doc.get("isbn").get(0).asText() : null;
 
-        // OpenLibrary cover image API uses cover_i
         String coverImage = doc.has("cover_i")
                 ? "https://covers.openlibrary.org/b/id/" + doc.get("cover_i").asText() + "-L.jpg" : null;
 
@@ -113,7 +119,6 @@ public class OpenLibraryWebClient {
             }
         }
 
-        // Return the DTO (metrics and favourite status are null for now)
         return new BookDto(id, title, null, null, publishYear, isbn, coverImage, authors, null, null, null, null);
     }
 }

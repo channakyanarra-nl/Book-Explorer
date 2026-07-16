@@ -4,8 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j; // 1. Added Lombok Import
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -13,11 +12,9 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+@Slf4j
 @Service
 public class JwtService {
-
-    // Logger
-    private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -31,6 +28,8 @@ public class JwtService {
     }
 
     public String generateToken(String email) {
+        log.debug("Generating new JWT token for user: {}", email);
+
         return Jwts.builder()
                 .subject(email)
                 .issuedAt(new Date())
@@ -40,6 +39,8 @@ public class JwtService {
     }
 
     public String extractUsername(String token) {
+        log.debug("Extracting username from provided JWT token");
+
         Claims claims = Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
@@ -56,11 +57,12 @@ public class JwtService {
                     .build()
                     .parseSignedClaims(token);
 
+            log.debug("JWT token validation successful");
             return true;
 
         } catch (JwtException | IllegalArgumentException e) {
-            // Our touch: Instead of silently failing, we log the exact reason it failed
-            logger.warn("Invalid JWT token: {}", e.getMessage());
+            // Using the @Slf4j 'log' instance instead of the manual 'logger'
+            log.warn("Invalid JWT token: {}", e.getMessage());
             return false;
         }
     }
