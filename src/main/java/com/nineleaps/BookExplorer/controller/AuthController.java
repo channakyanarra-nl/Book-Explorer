@@ -3,8 +3,11 @@ package com.nineleaps.BookExplorer.controller;
 import com.nineleaps.BookExplorer.dto.AuthResponse;
 import com.nineleaps.BookExplorer.dto.RegisterInput;
 import com.nineleaps.BookExplorer.entity.User;
+import com.nineleaps.BookExplorer.exception.EmailAlreadyInUseException;
 import com.nineleaps.BookExplorer.repository.UserRepository;
 import com.nineleaps.BookExplorer.service.JwtService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,6 +15,8 @@ import org.springframework.stereotype.Controller;
 
 @Controller
 public class AuthController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -25,9 +30,13 @@ public class AuthController {
 
     @MutationMapping
     public User register(@Argument RegisterInput input) {
+        logger.info("Attempting Registration for user : "+input.email());
+
         if (userRepository.existsByEmail(input.email())) {
-            throw new RuntimeException("Email already in use");
+            logger.error("Email {} entered is already in use", input.email());
+            throw new EmailAlreadyInUseException("Email already in use");
         }
+
 
         User user = new User();
         user.setName(input.name());

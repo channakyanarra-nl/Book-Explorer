@@ -16,7 +16,7 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    // Our touch: A logger to trace exact token failures
+    // Logger
     private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
 
     @Value("${jwt.secret}")
