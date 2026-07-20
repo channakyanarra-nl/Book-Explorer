@@ -2,13 +2,14 @@ package com.nineleaps.BookExplorer.controller;
 
 import com.nineleaps.BookExplorer.dto.BookDto;
 import com.nineleaps.BookExplorer.dto.BookSearchResponse;
+import com.nineleaps.BookExplorer.dto.FavouriteResponse;
+import com.nineleaps.BookExplorer.dto.ReviewInput;
 import com.nineleaps.BookExplorer.entity.Review;
-import com.nineleaps.BookExplorer.repository.ReviewRepository;
+import com.nineleaps.BookExplorer.service.FavouriteService;
 import com.nineleaps.BookExplorer.service.OpenLibraryService;
-import lombok.extern.slf4j.Slf4j; // 1. Import Lombok logging
-import org.springframework.graphql.data.method.annotation.Argument;
-import org.springframework.graphql.data.method.annotation.QueryMapping;
-import org.springframework.graphql.data.method.annotation.SchemaMapping;
+import com.nineleaps.BookExplorer.service.ReviewService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.graphql.data.method.annotation.*;
 import org.springframework.stereotype.Controller;
 
 import java.util.List;
@@ -18,11 +19,16 @@ import java.util.List;
 public class BookController {
 
     private final OpenLibraryService openLibraryService;
-    private final ReviewRepository reviewRepository;
+    private final ReviewService reviewService;
+    private final FavouriteService favouriteService;
 
-    BookController(OpenLibraryService openLibraryService, ReviewRepository reviewRepository){
+    BookController(
+            OpenLibraryService openLibraryService,
+            ReviewService reviewService,
+            FavouriteService favouriteService){
         this.openLibraryService = openLibraryService;
-        this.reviewRepository = reviewRepository;
+        this.reviewService = reviewService;
+        this.favouriteService = favouriteService;
     }
 
     @QueryMapping
@@ -40,26 +46,91 @@ public class BookController {
     @SchemaMapping(typeName = "Book", field = "reviews")
     public List<Review> reviews(BookDto book) {
         log.debug("GraphQL Resolver: Fetching reviews for book id: '{}'", book.id());
-        return reviewRepository.findByBookId(book.id());
+        return reviewService.getReviewsForBook(book.id());
     }
 
     @SchemaMapping(typeName = "Book", field = "averageRating")
     public Float averageRating(BookDto book) {
         log.debug("GraphQL Resolver: Calculating average rating for book id: '{}'", book.id());
-        Double avg = reviewRepository.calculateAverageRatingByBookId(book.id());
-        return avg != null ? avg.floatValue() : 0.0f;
+        return reviewService.getAverageRating(book.id());
     }
 
     @SchemaMapping(typeName = "Book", field = "reviewCount")
     public Integer reviewCount(BookDto book) {
         log.debug("GraphQL Resolver: Counting reviews for book id: '{}'", book.id());
-        return (int) reviewRepository.countByBookId(book.id());
+        return reviewService.getReviewCount(book.id());
     }
 
     @SchemaMapping(typeName = "Book", field = "isFavourite")
-    public Boolean isFavourite(BookDto book) {
-        log.debug("GraphQL Resolver: Checking favourite status for book id: '{}'", book.id());
-        // We will wire this up to the actual user context soon!
-        return false;
+    public Boolean isFavourite(BookDto book, @ContextValue(name = "currentUserEmail", required = false) String email) {
+        if (email == null) return false;
+
+        log.debug("GraphQL Resolver: Checking favourite status for book id: '{}' against user: '{}'", book.id(), email);
+        return favouriteService.isFavourite(email, book.id());
+    }
+
+    @MutationMapping
+    public FavouriteResponse addFavourite(@Argument String bookId, @ContextValue(name = "currentUserEmail", required = false) String email) {
+        if (email == null) {
+            log.warn("Unauthorized attempt to add favourite for book: '{}'", bookId);
+            return new FavouriteResponse(false, "Unauthorized: Please log in to add favourites.");
+        }
+
+        log.info("GraphQL Mutation: addFavourite -> User: '{}', Book: '{}'", email, bookId);
+        return favouriteService.addFavourite(email, bookId);
+    }
+
+    @MutationMapping
+    public FavouriteResponse removeFavourite(@Argument String bookId, @ContextValue(name = "currentUserEmail", required = false) String email) {
+        if (email == null) {
+            log.warn("Unauthorized attempt to remove favourite for book: '{}'", bookId);
+            return new FavouriteResponse(false, "Unauthorized: Please log in to remove favourites.");
+        }
+
+        log.info("GraphQL Mutation: removeFavourite -> User: '{}', Book: '{}'", email, bookId);
+        return favouriteService.removeFavourite(email, bookId);
+    }
+
+    @MutationMapping
+    public Review addReview(
+            @Argument ReviewInput input,
+            @ContextValue(name = "currentUserEmail", required = false) String email) {
+
+        if (email == null) {
+            log.warn("Unauthorized addReview attempt for book: '{}'", input.bookId());
+            throw new RuntimeException("Unauthorized: Please log in to leave a review.");
+        }
+
+        log.info("GraphQL Mutation: addReview -> User: '{}', Book: '{}'", email, input.bookId());
+        return reviewService.addReview(email, input);
+    }
+
+    @MutationMapping
+    public Review updateReview(
+            @Argument Long reviewId,
+            @Argument ReviewInput input,
+            @ContextValue(name = "currentUserEmail", required = false) String email) {
+
+        if (email == null) {
+            log.warn("Unauthorized updateReview attempt for review ID: {}", reviewId);
+            throw new RuntimeException("Unauthorized: Please log in to update a review.");
+        }
+
+        log.info("GraphQL Mutation: updateReview -> User: '{}', Review ID: {}", email, reviewId);
+        return reviewService.updateReview(email, reviewId, input);
+    }
+
+    @MutationMapping
+    public Boolean deleteReview(
+            @Argument Long reviewId,
+            @ContextValue(name = "currentUserEmail", required = false) String email) {
+
+        if (email == null) {
+            log.warn("Unauthorized deleteReview attempt for review ID: {}", reviewId);
+            throw new RuntimeException("Unauthorized: Please log in to delete a review.");
+        }
+
+        log.info("GraphQL Mutation: deleteReview -> User: '{}', Review ID: {}", email, reviewId);
+        return reviewService.deleteReview(email, reviewId);
     }
 }

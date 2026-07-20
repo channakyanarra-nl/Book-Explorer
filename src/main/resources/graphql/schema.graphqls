@@ -31,9 +31,24 @@ type User {
     email: String
 }
 
+type Review {
+    id: ID
+    rating: Int
+    review: String
+    createdAt: String
+    updatedAt: String
+    user: User
+}
+
+
 type AuthResponse {
     token: String
     user: User
+}
+
+type FavouriteResponse {
+    success: Boolean
+    message: String
 }
 
 input RegisterInput {
@@ -42,9 +57,14 @@ input RegisterInput {
     password: String!
 }
 
+input ReviewInput {
+    bookId: ID!
+    rating: Int!
+    review: String!
+}
+
 
 type Query {
-
     # Search books from Open Library
     searchBooks(
         title: String!
@@ -68,4 +88,27 @@ type Mutation {
         email: String!
         password: String!
     ): AuthResponse
+
+    addFavourite(
+        bookId: ID!
+    ): FavouriteResponse
+
+    removeFavourite(
+        bookId: ID!
+    ): FavouriteResponse
+
+    addReview(
+        input: ReviewInput!
+    ): Review
+
+    updateReview(
+        reviewId: ID!
+        input: ReviewInput!
+    ): Review
+
+    deleteReview(
+        reviewId: ID!
+    ): Boolean
+
+
 }
